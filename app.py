@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 import imaplib
 import email
 from email.header import decode_header
@@ -47,11 +47,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # Routes
-@app.route('/')
-# def index():
-#     return render_template('index.html')
-
-
 @app.route('/api/summarize', methods=['POST'])
 def summarize_email():
     try:
