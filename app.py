@@ -31,8 +31,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Constants
-EMAIL = "alihamzasultanacc3@gmail.com"
-APP_PASSWORD = "ijwd wmln bcbd vsql"
+# EMAIL = "alihamzasultanacc3@gmail.com"
+# APP_PASSWORD = "ijwd wmln bcbd vsql"
+EMAIL="chatfasih@gmail.com"
+APP_PASSWORD="qgib cymr vsji dtpg"
 VALID_CATEGORIES = ['urgent', 'support', 'sales', 'complaint', 'newsletter', 'other']
 BATCH_SIZE = 10
 
