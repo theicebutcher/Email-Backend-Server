@@ -48,8 +48,8 @@ logging.basicConfig(level=logging.INFO)
 
 # Routes
 @app.route('/')
-def index():
-    return render_template('index.html')
+# def index():
+#     return render_template('index.html')
 
 
 @app.route('/api/summarize', methods=['POST'])
