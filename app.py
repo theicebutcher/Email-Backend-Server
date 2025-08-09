@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import imaplib
 import email
 from email.header import decode_header
@@ -31,10 +31,8 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Constants
-# EMAIL = "alihamzasultanacc3@gmail.com"
-# APP_PASSWORD = "ijwd wmln bcbd vsql"
-EMAIL="chatfasih@gmail.com"
-APP_PASSWORD="qgib cymr vsji dtpg"
+EMAIL = "alihamzasultanacc3@gmail.com"
+APP_PASSWORD = "ijwd wmln bcbd vsql"
 VALID_CATEGORIES = ['urgent', 'support', 'sales', 'complaint', 'newsletter', 'other']
 BATCH_SIZE = 10
 
@@ -47,6 +45,11 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
 @app.route('/api/summarize', methods=['POST'])
 def summarize_email():
     try:
@@ -482,4 +485,3 @@ def fetch_emails():
 if __name__ == "__main__":
     threading.Thread(target=check_and_upload_emails, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
