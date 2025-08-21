@@ -99,7 +99,29 @@ def summarize_email():
         logger.error(f"Error in /api/summarize: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to generate summary", "details": str(e)}), 500
 
-
+def detect_emotion(email_content: str) -> str:
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Detect the main emotion of the sender from the email content. "
+                        "Reply with only one emotion word, e.g., happy, sad, angry, frustrated, thankful, excited, neutral."
+                    )
+                },
+                {"role": "user", "content": email_content[:4000]}
+            ],
+            max_tokens=10,
+            temperature=0
+        )
+        emotion = response.choices[0].message.content.strip().lower()
+        logger.info(f"✅ Email emotion detected: {emotion}")
+        return emotion
+    except Exception as e:
+        logger.error(f"❌ Error detecting emotion: {e}")
+        return "neutral"
 
 @app.route("/api/reply", methods=["POST"])
 def generate_reply():
@@ -279,10 +301,13 @@ def classify_email(email_id: int, email_content: str):
             max_tokens=10
         )
         category = response.choices[0].message.content.lower().strip()
+        logger.info(f"✅ Email Category detected: {category}")
         return category if category in VALID_CATEGORIES[:-1] else 'other'
     except Exception as e:
         logger.error(f"Error processing email ID {email_id}: {e}")
         return 'other'
+import threading
+
 import threading
 
 def check_and_upload_emails():
@@ -340,9 +365,27 @@ def check_and_upload_emails():
                             if not body.strip():
                                 logger.info(f"⛔ Skipped email from {sender_email} - Empty body")
                                 continue
-
+                            if len(body.split()) > 200:
+                                logger.info(f"⛔ Skipped email from {sender_email} - Body too long ({len(body.split())} words)")
+                                continue
                             unique_email_id = generate_stable_email_id(sender_email, subject, date)
-                            category = classify_email(0, body)
+                            # ✅ Detect emotion here, after body is extracted and before Supabase upload
+                            try:
+                                category = classify_email(0, body)
+                                logger.info(f"Email: {sender_email} - Detected Category: {category}") # debug step
+                            except Exception as e:
+                                logger.error(f"❌ Error detecting Category for {sender_email}: {e}")
+                                category = "neutral"  # Default to neutral on error
+
+                            time.sleep(10)
+                            
+                            # ✅ Detect emotion here, after body is extracted and before Supabase upload
+                            try:
+                                emotion = detect_emotion(body)
+                                logger.info(f"Email: {sender_email} - Detected Emotion: {emotion}") # debug step
+                            except Exception as e:
+                                logger.error(f"❌ Error detecting emotion for {sender_email}: {e}")
+                                emotion = "neutral"  # Default to neutral on error
 
 
                             # Insert only if not already present
@@ -361,6 +404,7 @@ def check_and_upload_emails():
                                     "email": sender_email,
                                     "sender_name": sender_name,
                                     "sender_image": sender_image,
+                                    "emotion": emotion
                                 }).execute()
                                 logger.info(f"✅ Uploaded email from {sender_email} to Supabase")
                             else:
@@ -375,6 +419,8 @@ def check_and_upload_emails():
             logger.exception("🔥 Exception in background email checker")
 
         time.sleep(10)
+
+
 def get_gravatar_url(email):
     hash = hashlib.md5(email.strip().lower().encode()).hexdigest()
     return f"https://www.gravatar.com/avatar/{hash}?d=identicon"
@@ -440,9 +486,22 @@ def fetch_emails():
                             logger.info(f"⛔ Skipped email from {sender_email} - Empty body")
                             continue
 
+                        # ✅ Skip long emails (more than 200 words)
+                        if len(body.split()) > 200:
+                            logger.info(f"⛔ Skipped email from {sender_email} - Body too long ({len(body.split())} words)")
+                            continue
+
                         # Now that we have all values
                         unique_email_id = generate_stable_email_id(sender_email, subject, date)
                         category = classify_email(int(num.decode()), body)
+
+                        # ✅ Detect emotion here, after body is extracted
+                        try:
+                            emotion = detect_emotion(body)
+                            logger.info(f"Email: {sender_email} - Detected Emotion: {emotion}")
+                        except Exception as e:
+                            logger.error(f"❌ Error detecting emotion for {sender_email}: {e}")
+                            emotion = "neutral"  # Default to neutral on error
 
                         # Upload if not already exists
                         exists = supabase.table("emails").select("id").eq("id", unique_email_id).execute()
@@ -460,10 +519,9 @@ def fetch_emails():
                                 "email": sender_email,
                                 "sender_image": sender_image,
                                 "sender_name": sender_name,
+                                "emotion": emotion,
                             }).execute()
                             logger.info(f"✅ Uploaded email from {sender_email} to Supabase")
-                           
-
                         else:
                             logger.info(f"⏭️ Email already exists: {unique_email_id}")
 
@@ -480,8 +538,6 @@ def fetch_emails():
     except Exception as e:
         logger.exception("Failed to fetch emails")
         return jsonify({"error": str(e)}), 500
-
-
 if __name__ == "__main__":
     threading.Thread(target=check_and_upload_emails, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True)
